@@ -1,34 +1,27 @@
 package com.example.taller3.activities
 
 import android.Manifest
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.location.Location
 import android.graphics.BitmapFactory
+import android.location.Location
 import android.net.Uri
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.result.ActivityResultCallback
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import com.example.taller3.databinding.ActivityRegistroBinding
+import com.google.android.gms.location.*
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.ktx.auth
+import com.google.firebase.ktx.Firebase
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageReference
 import com.google.firebase.storage.UploadTask
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationCallback
-import com.google.android.gms.location.LocationRequest
-import com.google.android.gms.location.LocationResult
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.Priority
-import com.parse.ParseACL
-import com.parse.ParseException
-import com.parse.ParseObject
-import com.parse.ParseUser
 
 class RegistroActivity : AppCompatActivity() {
     private lateinit var binding: ActivityRegistroBinding
@@ -37,38 +30,32 @@ class RegistroActivity : AppCompatActivity() {
     var nombre = ""
     var contrasena = ""
     var confirmarContrasena = ""
-    var apellido =""
-    var numIdentificacion =""
+    var apellido = ""
+    var numIdentificacion = ""
+
     // latitud y longitud de la ubicación actual
     var latitud = 0.0
     var longitud = 0.0
-    lateinit var lastLocation : Location // Última ubicación conocida
+    lateinit var lastLocation: Location // Última ubicación conocida
     private val permisosUbicacionRequestCode = 123 // Identificador único para la solicitud de permisos
 
-
-
     lateinit var locationClient: FusedLocationProviderClient // Cliente de ubicación
-    lateinit var locationRequest : LocationRequest // Solicitud de ubicación
+    lateinit var locationRequest: LocationRequest // Solicitud de ubicación
     lateinit var locationCallback: LocationCallback // Callback de ubicación
 
     val TAG = "GREETING_APP"
-    val USER_CN = "Usuario"
     private var isImageSelected = false
 
-    private lateinit var uriUpload : Uri
+    private lateinit var uriUpload: Uri
 
+    val getContentGallery = registerForActivityResult(ActivityResultContracts.GetContent(), ActivityResultCallback {
+        loadImage(it!!)
+    })
 
-    val getContentGallery = registerForActivityResult(
-        ActivityResultContracts.GetContent(),
-        ActivityResultCallback {
-            loadImage(it!!)
-        }
-    )
-
-    lateinit var storageRef : StorageReference
+    lateinit var storageRef: StorageReference
+    private lateinit var auth: FirebaseAuth
 
     override fun onCreate(savedInstanceState: Bundle?) {
-
         super.onCreate(savedInstanceState)
         binding = ActivityRegistroBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -77,12 +64,14 @@ class RegistroActivity : AppCompatActivity() {
         locationRequest = createLocationRequest()
         locationCallback = createLocationCallBack()
 
+        auth = Firebase.auth // Inicializar Firebase Authentication
+
         // Verificar si ya se tienen permisos. si se tienen, se inicia la actualizacion de ubicacion.
         startLocationUpdates()
 
         setupRegisterButton()
 
-        binding.imageView12.setOnClickListener{
+        binding.imageView12.setOnClickListener {
             getContentGallery.launch("image/*")
         }
 
@@ -90,8 +79,6 @@ class RegistroActivity : AppCompatActivity() {
             val intent = Intent(this, MainActivity::class.java)
             startActivity(intent)
         }
-
-
     }
 
     private fun setupRegisterButton() {
@@ -105,56 +92,32 @@ class RegistroActivity : AppCompatActivity() {
         }
     }
 
-
     private fun guardarUsuario() {
-        var userRegistro = ParseUser()
-        userRegistro.username = binding.inputCorreoR.text.toString()
-        userRegistro.setPassword(binding.inputContraseAR.text.toString())
+        val correo = binding.inputCorreoR.text.toString()
+        val contrasena = binding.inputContraseAR.text.toString()
 
-        nombre = binding.inputNombreR.text.toString()
-        userRegistro.put("nombre", nombre)
+        // Crear usuario en Firebase Authentication
+        auth.createUserWithEmailAndPassword(correo, contrasena).addOnCompleteListener(this) { task ->
+            if (task.isSuccessful) {
+                // Registro exitoso
+                val user = auth.currentUser
+                // Continuar con el resto de la lógica aquí
+                // ...
 
-        apellido = binding.inputApellidoR.text.toString()
-        userRegistro.put("apellido", apellido)
+                // Subir imagen a Firebase Storage
+                uploadFirebaseImage(uriUpload)
 
-        numIdentificacion = binding.inputIdentificacionR.text.toString()
-        userRegistro.put("numIdentificacion", numIdentificacion)
-
-        userRegistro.put("estado","F")
-
-        userRegistro.put("latitud",latitud)
-        userRegistro.put("longitud",longitud)
-
-        val acl = ParseACL()
-        acl.publicReadAccess = true
-        userRegistro.acl=acl
-
-        userRegistro.signUpInBackground { e: ParseException? ->
-            if (e == null) {
-                // Registro exitoso, guarda el token de sesión en SharedPreferences
-                val sessionToken = userRegistro.sessionToken
-                val sharedPreferences = getSharedPreferences("MyAppPrefs", Context.MODE_PRIVATE)
-                val editor = sharedPreferences.edit()
-                editor.putString("sessionToken", sessionToken)
-                editor.apply()
-                Log.e("PARSE", "Registro exitoso: $sessionToken")
                 val intent = Intent(this, MapActivity::class.java)
                 startActivity(intent)
             } else {
-                val errorMessage = e.message
-                Log.e("PARSE", "Error durante el registro: $errorMessage", e)
-                // También puedes imprimir el código de error para tener más información
-                Log.e("PARSE", "Código de error: ${e.code}")
+                // Si falla el registro, manejar el error
+                Log.w(TAG, "Error en el registro", task.exception)
+                Toast.makeText(baseContext, "Error en el registro", Toast.LENGTH_SHORT).show()
             }
-
         }
-
-        uploadFirebaseImage(uriUpload)
-
     }
 
     private fun validateForm(): Boolean {
-
         val nombre = binding.inputNombreR.text.toString()
         val apellido = binding.inputApellidoR.text.toString()
         val correo = binding.inputCorreoR.text.toString()
@@ -162,9 +125,8 @@ class RegistroActivity : AppCompatActivity() {
         val contrasena = binding.inputContraseAR.text.toString()
         val confirmarContrasena = binding.inputContraseAConfirmaRr.text.toString()
 
-
         val todasLasCasillasTienenTexto =
-        nombre.isNotEmpty() && apellido.isNotEmpty() && correo.isNotEmpty() && numIdentificacion.isNotEmpty() && contrasena.isNotEmpty() && confirmarContrasena.isNotEmpty()
+            nombre.isNotEmpty() && apellido.isNotEmpty() && correo.isNotEmpty() && numIdentificacion.isNotEmpty() && contrasena.isNotEmpty() && confirmarContrasena.isNotEmpty()
 
         val emailValido = isValidEmail(correo)
 
@@ -178,48 +140,45 @@ class RegistroActivity : AppCompatActivity() {
         return email.matches(emailRegex)
     }
 
-    fun loadImage(uri : Uri){
-        val imageStream = getContentResolver().openInputStream(uri)
+    fun loadImage(uri: Uri) {
+        val imageStream = contentResolver.openInputStream(uri)
         val bitmap = BitmapFactory.decodeStream(imageStream)
         binding.imageView12.setImageBitmap(bitmap)
         isImageSelected = true
-        uriUpload=uri
+        uriUpload = uri
     }
 
     fun uploadFirebaseImage(uriUpload: Uri) {
         // Obtén una referencia al lugar donde las fotos serán guardadas
-        val currentUser = ParseUser.getCurrentUser()
-        val objectId = currentUser?.objectId
+        val currentUser = auth.currentUser
+        val objectId = currentUser?.uid
         val storageRef: StorageReference = FirebaseStorage.getInstance().reference.child("images/${objectId}.png")
 
         // Inicia la carga del archivo
-        storageRef.putFile(uriUpload)
-            .addOnSuccessListener { taskSnapshot: UploadTask.TaskSnapshot ->
-                // La carga fue exitosa, aquí puedes obtener, por ejemplo, la URL de la imagen
-                val downloadUrl = taskSnapshot.metadata?.reference?.downloadUrl
-                downloadUrl?.addOnSuccessListener { uri ->
-                    println("Imagen cargada con éxito. URL: $uri")
-                }
+        storageRef.putFile(uriUpload).addOnSuccessListener { taskSnapshot: UploadTask.TaskSnapshot ->
+            // La carga fue exitosa, aquí puedes obtener, por ejemplo, la URL de la imagen
+            val downloadUrl = taskSnapshot.metadata?.reference?.downloadUrl
+            downloadUrl?.addOnSuccessListener { uri ->
+                println("Imagen cargada con éxito. URL: $uri")
             }
-            .addOnFailureListener { exception: Exception ->
-                // La carga falló, maneja el error
-                println("Error al cargar la imagen: ${exception.message}")
-            }
+        }.addOnFailureListener { exception: Exception ->
+            // La carga falló, maneja el error
+            println("Error al cargar la imagen: ${exception.message}")
+        }
     }
 
-    fun createLocationRequest() : LocationRequest{
-        locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 2000)
-            .setWaitForAccurateLocation(true)
-            .setMinUpdateIntervalMillis(1000)
-            .build()
+    fun createLocationRequest(): LocationRequest {
+        locationRequest =
+            LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 2000).setWaitForAccurateLocation(true)
+                .setMinUpdateIntervalMillis(1000).build()
         return locationRequest
     }
 
-    fun createLocationCallBack() : LocationCallback{
-        val locationCallback = object : LocationCallback(){
+    fun createLocationCallBack(): LocationCallback {
+        val locationCallback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
                 super.onLocationResult(result)
-                if(result!=null){
+                if (result != null) {
                     lastLocation = result.lastLocation!!
                     latitud = lastLocation.latitude
                     longitud = lastLocation.longitude
@@ -229,17 +188,15 @@ class RegistroActivity : AppCompatActivity() {
         return locationCallback
     }
 
-    fun startLocationUpdates(){
+    fun startLocationUpdates() {
         if (ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_FINE_LOCATION
+                this, Manifest.permission.ACCESS_FINE_LOCATION
             ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_COARSE_LOCATION
+                this, Manifest.permission.ACCESS_COARSE_LOCATION
             ) != PackageManager.PERMISSION_GRANTED
         ) {
             requestLocationPermission()
-        }else{
+        } else {
             locationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
         }
     }
@@ -247,11 +204,7 @@ class RegistroActivity : AppCompatActivity() {
     // Función para solicitar permisos de ubicacion al usuario
     private fun requestLocationPermission() {
         ActivityCompat.requestPermissions(
-            this,
-            arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION),
-            permisosUbicacionRequestCode
+            this, arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION), permisosUbicacionRequestCode
         )
     }
-
-
 }

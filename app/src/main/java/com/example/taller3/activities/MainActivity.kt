@@ -7,88 +7,66 @@ import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.example.taller3.databinding.ActivityMainBinding
-import com.parse.ParseAnonymousUtils
-import com.parse.ParseException
-import com.parse.ParseUser
-
+import com.google.firebase.FirebaseApp
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.ktx.auth
+import com.google.firebase.ktx.Firebase
 
 class MainActivity : AppCompatActivity() {
+
+
     private lateinit var binding: ActivityMainBinding
-
-    val USER_CN = "Usuario"
-
-    var usuario = ""
-    var contraseña = ""
-
+    private lateinit var auth: FirebaseAuth
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        //Autenticación automatica con parse-server
-        loginParse()
+        FirebaseAuth.getInstance();
+
+        auth = Firebase.auth
+
+        // Autenticación automática con Firebase Authentication
+        loginFirebase()
 
         // Escucha el evento del botón de login
-        // Autenticación con usuario y contraseña, con parse-server
+        // Autenticación con usuario y contraseña, con Firebase Authentication
         setupLoginButton()
 
-        //Escucha el evento del boton de registro
+        // Escucha el evento del botón de registro
         setupRegisterButton()
-
-
     }
 
-    private fun loginParse(){
+    private fun loginFirebase() {
         val sharedPreferences = getSharedPreferences("MyAppPrefs", Context.MODE_PRIVATE)
         val sessionToken = sharedPreferences.getString("sessionToken", null)
 
         if (sessionToken != null) {
             // Iniciar sesión automáticamente con el token de sesión
-            ParseUser.becomeInBackground(sessionToken) { user: ParseUser?, e: ParseException? ->
-                if (user != null) {
-                    val toast = Toast.makeText(
-                        this,
-                        "Token de usuario recuperado: ${user.username}",
-                        Toast.LENGTH_SHORT
-                    )
-                    toast.show()
-
-                    user.put("estado","F")
-                    user.saveInBackground { e ->
-                        if (e == null) {
-                            Log.i("ACT-ESTADO","El estado se setea en false")
-                        } else {
-                            // Manejar errores, por ejemplo, mostrar un mensaje al usuario
-                        }
+            auth.signInWithCustomToken(sessionToken).addOnCompleteListener(this) { task ->
+                    if (task.isSuccessful) {
+                        // Registro exitoso
+                        Log.i("FIREBASE", "Inicio de sesión automático exitoso")
+                        val intent = Intent(this, MapActivity::class.java)
+                        startActivity(intent)
+                    } else {
+                        // Si falla el inicio de sesión, manejar el error
+                        Log.w("FIREBASE", "Error en el inicio de sesión automático", task.exception)
+                        eliminarTokenDeSesion()
                     }
-
-                    val intent = Intent (this, MapActivity::class.java)
-                    startActivity(intent)
-                } else {
-                    val toast = Toast.makeText(
-                        this,
-                        "Error al iniciar sesión automáticamente",
-                        Toast.LENGTH_SHORT
-                    )
-                    toast.show()
-                    eliminarTokenDeSesion()
                 }
-            }
-        }else{
-            ParseAnonymousUtils.logIn { user, e ->
-                if (e == null) {
-                    // El inicio de sesión anónimo fue exitoso
-                    val userId = user.objectId
-                    // Realiza acciones con el usuario anónimo, si es necesario
-                } else {
-                    // El inicio de sesión anónimo falló
-                    Log.e("Parse", "Error al iniciar sesión anónimamente: " + e.message)
-                    Log.e("PARSE",e.stackTraceToString())
+        } else {
+            // Iniciar sesión anónima con Firebase Authentication
+            auth.signInAnonymously().addOnCompleteListener(this) { task ->
+                    if (task.isSuccessful) {
+                        // Inicio de sesión anónimo exitoso
+                        Log.i("FIREBASE", "Inicio de sesión anónimo exitoso")
+                    } else {
+                        // Si falla el inicio de sesión anónimo, manejar el error
+                        Log.w("FIREBASE", "Error en el inicio de sesión anónimo", task.exception)
+                    }
                 }
-                Log.d("PARSE","entra a anonimo")
-            }
-
         }
     }
 
@@ -98,26 +76,23 @@ class MainActivity : AppCompatActivity() {
         editor.remove("sessionToken")
         editor.apply()
 
-        ParseAnonymousUtils.logIn { user, e ->
-            if (e == null) {
-                // El inicio de sesión anónimo fue exitoso
-                val userId = user.objectId
-                // Realiza acciones con el usuario anónimo, si es necesario
-            } else {
-                // El inicio de sesión anónimo falló
-                Log.e("Parse", "Error al iniciar sesión anónimamente: " + e.message)
-                Log.e("PARSE",e.stackTraceToString())
+        // Iniciar sesión anónima con Firebase Authentication
+        auth.signInAnonymously().addOnCompleteListener(this) { task ->
+                if (task.isSuccessful) {
+                    // Inicio de sesión anónimo exitoso
+                    Log.i("FIREBASE", "Inicio de sesión anónimo exitoso")
+                } else {
+                    // Si falla el inicio de sesión anónimo, manejar el error
+                    Log.w("FIREBASE", "Error en el inicio de sesión anónimo", task.exception)
+                }
             }
-            Log.d("PARSE","entra a anonimo")
-        }
     }
 
     private fun validateForm(): Boolean {
         val usuario = binding.inputUsuario.text.toString()
         val contrasena = binding.inputContrasena.text.toString()
 
-        val todasLasCasillasTienenTexto = usuario.isNotEmpty() &&
-                contrasena.isNotEmpty()
+        val todasLasCasillasTienenTexto = usuario.isNotEmpty() && contrasena.isNotEmpty()
 
         return todasLasCasillasTienenTexto
     }
@@ -128,33 +103,31 @@ class MainActivity : AppCompatActivity() {
                 val usuario = binding.inputUsuario.text.toString()
                 val contrasena = binding.inputContrasena.text.toString()
 
-                ParseUser.logInInBackground(usuario, contrasena) { user: ParseUser?, e: ParseException? ->
-                    if (user != null) {
-                        val sessionToken = user.sessionToken
-                        val sharedPreferences = getSharedPreferences("MyAppPrefs", Context.MODE_PRIVATE)
-                        val editor = sharedPreferences.edit()
-                        editor.putString("sessionToken", sessionToken)
-                        editor.apply()
-                        Log.e("PARSE", "Login exitoso: $sessionToken")
-
-                        val intent = Intent(this, MapActivity::class.java)
-                        startActivity(intent)
-                    } else {
-                        val toast = Toast.makeText(this, "El usuario no existe", Toast.LENGTH_SHORT)
-                        toast.show()
+                // Autenticación con Firebase Authentication
+                auth.signInWithEmailAndPassword(usuario, contrasena).addOnCompleteListener(this) { task ->
+                        if (task.isSuccessful) {
+                            // Inicio de sesión exitoso
+                            Log.i("FIREBASE", "Inicio de sesión exitoso")
+                            val user = auth.currentUser
+                            val intent = Intent(this, MapActivity::class.java)
+                            startActivity(intent)
+                        } else {
+                            // Si falla el inicio de sesión, manejar el error
+                            Log.w("FIREBASE", "Error en el inicio de sesión", task.exception)
+                            val toast = Toast.makeText(this, "El usuario no existe", Toast.LENGTH_SHORT)
+                            toast.show()
+                        }
                     }
-                }
-            }
-            else{
+            } else {
                 val toast = Toast.makeText(this, "Campos incompletos", Toast.LENGTH_SHORT)
                 toast.show()
             }
         }
     }
 
-    private fun setupRegisterButton(){
-        binding.botonRegistrarse.setOnClickListener{
-            val intent = Intent (this, RegistroActivity::class.java)
+    private fun setupRegisterButton() {
+        binding.botonRegistrarse.setOnClickListener {
+            val intent = Intent(this, RegistroActivity::class.java)
             startActivity(intent)
         }
     }
