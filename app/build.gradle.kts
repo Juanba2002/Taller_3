@@ -44,9 +44,8 @@ android {
 dependencies {
 
 
-    implementation("com.google.firebase:firebase-analytics")
+
     implementation("com.google.firebase:firebase-auth-ktx")
-    implementation(platform("com.google.firebase:firebase-bom:32.6.0"))
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.core:core-ktx:1.9.0")
     implementation("com.google.android.material:material:1.10.0")
@@ -61,7 +60,7 @@ dependencies {
     implementation("com.github.parse-community:ParseLiveQuery-Android:1.2.2")
     implementation("com.mikhaellopez:circularprogressbar:3.1.0")
     implementation("com.makeramen:roundedimageview:2.3.0")
-    implementation("com.google.firebase:firebase-storage:20.3.0")
+
     implementation("androidx.navigation:navigation-fragment-ktx:2.5.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.5.2")
     implementation("androidx.navigation:navigation-ui-ktx:2.5.3")

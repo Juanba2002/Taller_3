@@ -17,15 +17,6 @@
         app:layout_constraintTop_toTopOf="parent"
         app:srcCompat="@drawable/moreinfo_arrow" />
 
-    <ImageView
-        android:id="@+id/imageView12"
-        android:layout_width="match_parent"
-        android:layout_height="150dp"
-        android:layout_marginTop="64dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:srcCompat="@drawable/ic_launcher_background" />
 
     <EditText
         android:id="@+id/inputCorreoR"

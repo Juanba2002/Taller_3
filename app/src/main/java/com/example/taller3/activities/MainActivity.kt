@@ -23,8 +23,6 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        FirebaseAuth.getInstance();
-
         auth = Firebase.auth
 
         // Autenticación automática con Firebase Authentication

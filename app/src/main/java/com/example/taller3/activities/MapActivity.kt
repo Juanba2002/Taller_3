@@ -16,6 +16,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Looper
 import android.util.Log
+import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -32,6 +33,7 @@ import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import com.google.firebase.auth.FirebaseAuth
 import com.mikhaellopez.circularprogressbar.CircularProgressBar
 import com.parse.ParseException
 import com.parse.ParseObject
@@ -65,6 +67,7 @@ class MapActivity : AppCompatActivity() {
     lateinit var parseQuery: ParseQuery<ParseUser>
     private val userStates = HashMap<String, String>()
 
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMapBinding.inflate(layoutInflater)
@@ -75,8 +78,17 @@ class MapActivity : AppCompatActivity() {
         val extras = intent.extras
         parseLiveQueryClient = ParseLiveQueryClient.Factory.getClient()
 
+        val logOut: Button = findViewById(R.id.logOutbtn)
+
+        logOut.setOnClickListener {
+            FirebaseAuth.getInstance().signOut()
+            val intent = Intent(this, MainActivity::class.java)
+            startActivity(intent)
+        }
+
         // Verificar si ya se tienen permisos. si se tienen, se inicia la actualizacion de ubicacion.
         startLocationUpdates()
+
 
         // crear la base de datos
         lugares = getLugares()
@@ -128,11 +140,9 @@ class MapActivity : AppCompatActivity() {
             val intent = Intent(this, ListUsersActivity::class.java)
             startActivity(intent)
         }
-
-
-
-
     }
+
+
 
     // funcion para establecer el mapa en la actividad
     fun setMap(){
@@ -190,24 +200,34 @@ class MapActivity : AppCompatActivity() {
 
     fun createLocationCallBack() : LocationCallback{
         val locationCallback = object : LocationCallback(){
+
             override fun onLocationResult(result: LocationResult) {
                 super.onLocationResult(result)
-                if(result!=null){
+                if (result != null) {
                     lastLocation = result.lastLocation!!
-                    setMyLocationMarker()
-                    var userParse = ParseUser.getCurrentUser()
-                    userParse.put("latitud",lastLocation.latitude)
-                    userParse.put("longitud",lastLocation.longitude)
-                    userParse.saveInBackground { e ->
-                        if (e == null) {
-                            Log.d("PARSE","Localizacion actualizada a: "+lastLocation.latitude+","+lastLocation.longitude)
-                        } else {
-                            Log.d("PARSE","Error al actualizar Localizacion")
+
+                    // Check if a user is logged in
+                    val currentUser = ParseUser.getCurrentUser()
+                    if (currentUser != null) {
+                        // Update location for the logged-in user
+                        currentUser.put("latitud", lastLocation.latitude)
+                        currentUser.put("longitud", lastLocation.longitude)
+                        currentUser.saveInBackground { e ->
+                            if (e == null) {
+                                Log.d("PARSE", "Location updated to: ${lastLocation.latitude}, ${lastLocation.longitude}")
+                            } else {
+                                Log.d("PARSE", "Error updating location")
+                            }
                         }
+                    } else {
+                        // No user logged in, handle it as needed (e.g., store location locally, prompt user to log in, etc.)
+                        Log.d("PARSE", "No user logged in. Handle location update accordingly.")
                     }
 
+                    setMyLocationMarker()
                 }
             }
+
         }
         return locationCallback
     }
@@ -227,7 +247,9 @@ class MapActivity : AppCompatActivity() {
         }
     }
 
-    // funcion que mueve la camara, dadas la latitud y longitud.
+
+
+    // /funcion que mueve la camara, dadas la latitud y longitud.
     fun moveCamera(latitude: Double, longitude: Double){
         val geoPoint = GeoPoint(latitude, longitude)
         map.controller.animateTo(geoPoint)
